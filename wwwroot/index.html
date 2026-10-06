@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor Source Switcher</title>
+<style>
+  :root{
+    --bg:#0e0f11; --card:#16181b; --line:#26292e;
+    --fg:#e8eaed; --dim:#8b9099; --accent:#5b9dff;
+    --ok:#3fbf7f; --bad:#ff6b6b; --warn:#e0a33e;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:28px 20px 56px; background:var(--bg); color:var(--fg);
+    font:14px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:780px;margin:0 auto}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  h1{font-size:17px;font-weight:600;letter-spacing:-.01em;margin:0}
+  .ver{color:var(--dim);font-size:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .sub{color:var(--dim);font-size:13px;margin:0 0 22px}
+  .bar{display:flex;gap:10px;align-items:center;margin-bottom:16px}
+  button{
+    font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);
+    border-radius:8px;padding:7px 14px;cursor:pointer;transition:border-color .12s,background .12s;
+  }
+  button:hover{border-color:#3a3f47;background:#1b1e22}
+  button:disabled{opacity:.5;cursor:default}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:14px}
+  .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+  .mid{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--dim);margin-top:3px}
+  .desc{font-weight:600;font-size:14px}
+  .pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .pill.ok{background:rgba(63,191,127,.14);color:var(--ok)}
+  .pill.bad{background:rgba(255,107,107,.14);color:var(--bad)}
+  .note{font-size:12.5px;color:var(--dim);margin-top:11px;padding-left:11px;border-left:2px solid var(--line)}
+  .note.blocked{color:var(--warn);border-left-color:var(--warn)}
+  .meta{color:var(--dim);font-size:12px;margin-top:11px;display:flex;gap:18px;flex-wrap:wrap}
+  .meta b{color:var(--fg);font-weight:600}
+  .grid{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+  .grid button{font-size:12px;padding:6px 11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .grid button.here{border-color:var(--accent);color:var(--accent)}
+  .quiet{color:var(--dim);font-size:13px}
+  details{margin-top:14px}
+  summary{color:var(--dim);font-size:12px;cursor:pointer}
+  pre{font-size:11.5px;color:var(--dim);white-space:pre-wrap;word-break:break-word;margin:9px 0 0}
+  #toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+    background:#1d2024;border:1px solid var(--line);border-radius:9px;
+    padding:10px 16px;font-size:13px;max-width:min(92vw,600px);display:none;z-index:9;
+  }
+  #toast.ok{border-color:rgba(63,191,127,.5)}
+  #toast.bad{border-color:rgba(255,107,107,.5)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Monitor Source Switcher</h1>
+    <span class="ver" id="ver"></span>
+  </header>
+  <p class="sub">Switch a monitor's input source over DDC/CI. This page is just a client of the same HTTP API documented in the README.</p>
+
+  <div class="bar">
+    <button id="refresh">Refresh</button>
+    <span class="quiet" id="status">loading…</span>
+  </div>
+
+  <div id="monitors"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let toastTimer;
+
+function toast(message, kind){
+  const el = $('#toast');
+  el.textContent = message;
+  el.className = kind || '';
+  el.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = 'none'; }, 6000);
+}
+
+async function api(path, options){
+  const res = await fetch(path, options);
+  const text = await res.text();
+  let body;
+  try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
+  return { ok: res.ok, status: res.status, body };
+}
+
+function shell(text){
+  if (!text) return null;
+  const el = document.createElement('div');
+  el.className = 'mid';
+  el.textContent = text;
+  return el;
+}
+
+function render(monitors){
+  const host = $('#monitors');
+  host.innerHTML = '';
+
+  if (!monitors.length){
+    host.innerHTML = '<div class="card quiet">No monitors found.</div>';
+    return;
+  }
+
+  for (const m of monitors){
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const head = document.createElement('div');
+    head.className = 'chead';
+    head.innerHTML =
+      '<div>' +
+        '<div class="desc">' + (m.model || m.description || 'Monitor') + '</div>' +
+        '<div class="mid">id ' + m.id + (m.model ? ' · ' + m.description : '') + '</div>' +
+      '</div>' +
+      '<span class="pill ' + (m.ddcResponds ? 'ok' : 'bad') + '">' +
+        (m.ddcResponds ? 'DDC/CI responding' : 'no DDC/CI on this link') +
+      '</span>';
+    card.appendChild(head);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.innerHTML =
+      '<span>current input <b>' + (m.currentInput ?? 'not reported') + '</b></span>' +
+      '<span>brightness <b>' + (m.brightness ?? '—') + (m.brightnessMax ? ' / ' + m.brightnessMax : '') + '</b></span>' +
+      (m.supportsInputSelect === null || m.supportsInputSelect === undefined
+        ? ''
+        : '<span>input select <b>' + (m.supportsInputSelect ? 'supported' : 'not implemented') + '</b></span>');
+    card.appendChild(meta);
+
+    if (m.note){
+      const note = document.createElement('div');
+      note.className = 'note' + (m.supportsInputSelect === false || !m.ddcResponds ? ' blocked' : '');
+      note.textContent = m.note;
+      card.appendChild(note);
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+
+    for (const input of m.inputs){
+      const b = document.createElement('button');
+      b.textContent = input.name;
+      if (m.currentInput === input.name) b.className = 'here';
+      b.onclick = async () => {
+        b.disabled = true;
+        const r = await api('/api/monitors/' + m.id + '/input/' + input.name, { method: 'POST' });
+        b.disabled = false;
+
+        if (r.ok){
+          const verified = r.body.verified;
+          toast(input.name + ' → monitor ' + m.id +
+                (verified === true ? ' — confirmed by read-back'
+                 : verified === false ? ' — panel reports a different input'
+                 : ' — accepted (panel cannot confirm)'),
+                'ok');
+        } else {
+          toast('Monitor ' + m.id + ': ' + (r.body.error || ('HTTP ' + r.status)), 'bad');
+        }
+        load();
+      };
+      grid.appendChild(b);
+    }
+
+    card.appendChild(grid);
+
+    if (m.capabilities){
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = 'capabilities string';
+      const pre = document.createElement('pre');
+      pre.textContent = m.capabilities;
+      details.appendChild(summary);
+      details.appendChild(pre);
+      card.appendChild(details);
+    }
+
+    host.appendChild(card);
+  }
+}
+
+async function load(){
+  $('#status').textContent = 'loading…';
+  try {
+    const health = await api('/api/health');
+    if (health.body && health.body.version) $('#ver').textContent = 'v' + health.body.version;
+
+    const r = await api('/api/monitors');
+    if (!r.ok){
+      toast('Could not list monitors (HTTP ' + r.status + ')', 'bad');
+      $('#status').textContent = 'error';
+      return;
+    }
+
+    render(r.body);
+    $('#status').textContent = r.body.length + ' monitor' + (r.body.length === 1 ? '' : 's');
+  } catch (e){
+    $('#status').textContent = 'offline';
+    toast('Cannot reach the API: ' + e.message, 'bad');
+  }
+}
+
+$('#refresh').onclick = load;
+load();
+</script>
+</body>
+</html>

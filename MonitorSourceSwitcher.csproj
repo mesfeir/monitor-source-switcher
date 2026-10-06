@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MonitorSourceSwitcher</AssemblyName>
+    <RootNamespace>MonitorSourceSwitcher</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Version>1.0.0</Version>
+    <Product>Monitor Source Switcher</Product>
+    <Description>Switch monitor input sources over DDC/CI, with a local web UI and HTTP API.</Description>
+    <Platforms>AnyCPU</Platforms>
+  </PropertyGroup>
+
+</Project>
