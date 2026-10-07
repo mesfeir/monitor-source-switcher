@@ -17,6 +17,20 @@ cd /d "%~dp0"
 
 set "DLL=bin\Release\net9.0\MonitorSourceSwitcher.dll"
 
+rem ---------------------------------------------------------------------------
+rem  Helper machine (optional).
+rem
+rem  A second computer sitting on a monitor input this PC cannot reach over
+rem  DDC/CI. With this set, the app switches that monitor by ssh-ing here and
+rem  running m1ddc. Leave it empty and the app still runs - it will just report
+rem  that monitor as unmovable, which is the honest state of the hardware.
+rem
+rem  Set it to your own machine if you fork this.
+rem ---------------------------------------------------------------------------
+set "MAC=melsfeir@192.168.1.204"
+set "MAC_ARGS="
+if not "%MAC%"=="" set "MAC_ARGS=--mac %MAC%"
+
 where dotnet >nul 2>&1
 if errorlevel 1 (
     echo .NET is not on PATH. Install the .NET 9 runtime or SDK from
@@ -35,16 +49,17 @@ if not errorlevel 1 (
 )
 
 echo Starting Monitor Source Switcher on port %PORT%
+if not "%MAC%"=="" echo Switching unreachable monitors via %MAC%
 echo Close this window to stop it.
 echo.
 
 if exist "%DLL%" (
-    dotnet "%DLL%" --port %PORT% --open
+    dotnet "%DLL%" --port %PORT% --open %MAC_ARGS%
 ) else (
     rem No build yet: let the SDK build and run it. Slower on first launch.
     echo No build found - building with the .NET SDK first.
     echo.
-    dotnet run -- --port %PORT% --open
+    dotnet run -- --port %PORT% --open %MAC_ARGS%
 )
 
 :done

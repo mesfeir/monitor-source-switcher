@@ -114,15 +114,21 @@ function render(monitors){
     const card = document.createElement('div');
     card.className = 'card';
 
+    const viaMac = m.transport === 'mac';
+
     const head = document.createElement('div');
     head.className = 'chead';
     head.innerHTML =
       '<div>' +
         '<div class="desc">' + (m.model || m.description || 'Monitor') + '</div>' +
-        '<div class="mid">id ' + m.id + (m.model ? ' · ' + m.description : '') + '</div>' +
+        '<div class="mid">id ' + m.id +
+          (m.model ? ' · ' + m.description : '') +
+          (viaMac ? ' · switched through ' + m.transportDetail : '') +
+        '</div>' +
       '</div>' +
-      '<span class="pill ' + (m.ddcResponds ? 'ok' : 'bad') + '">' +
-        (m.ddcResponds ? 'DDC/CI responding' : 'no DDC/CI on this link') +
+      '<span class="pill ' + (viaMac || m.ddcResponds ? 'ok' : 'bad') + '">' +
+        (viaMac ? 'via ' + m.transportDetail
+                : m.ddcResponds ? 'DDC/CI responding' : 'no DDC/CI on this link') +
       '</span>';
     card.appendChild(head);
 
@@ -131,6 +137,7 @@ function render(monitors){
     meta.innerHTML =
       '<span>current input <b>' + (m.currentInput ?? 'not reported') + '</b></span>' +
       '<span>brightness <b>' + (m.brightness ?? '—') + (m.brightnessMax ? ' / ' + m.brightnessMax : '') + '</b></span>' +
+      '<span>switched by <b>' + (viaMac ? 'SSH to that machine' : 'this PC') + '</b></span>' +
       (m.supportsInputSelect === null || m.supportsInputSelect === undefined
         ? ''
         : '<span>input select <b>' + (m.supportsInputSelect ? 'supported' : 'not implemented') + '</b></span>');
@@ -138,7 +145,8 @@ function render(monitors){
 
     if (m.note){
       const note = document.createElement('div');
-      note.className = 'note' + (m.supportsInputSelect === false || !m.ddcResponds ? ' blocked' : '');
+      const blocked = !viaMac && (m.supportsInputSelect === false || !m.ddcResponds);
+      note.className = 'note' + (blocked ? ' blocked' : '');
       note.textContent = m.note;
       card.appendChild(note);
     }
@@ -157,8 +165,10 @@ function render(monitors){
 
         if (r.ok){
           const verified = r.body.verified;
+          const viaMac = r.body.transport === 'mac';
           toast(input.name + ' → monitor ' + m.id +
-                (verified === true ? ' — confirmed by read-back'
+                (viaMac ? ' — confirmed by ' + r.body.transportDetail
+                 : verified === true ? ' — confirmed by read-back'
                  : verified === false ? ' — panel reports a different input'
                  : ' — accepted (panel cannot confirm)'),
                 'ok');

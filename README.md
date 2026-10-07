@@ -143,6 +143,41 @@ Two ways, both dependency-free:
 curl -s -X POST http://127.0.0.1:8152/api/monitors/1/input/hdmi2 >nul
 ```
 
+## Switching a monitor this PC cannot reach
+
+Some monitors cannot be switched from the PC they are plugged into: on many Samsung Odyssey
+panels the DisplayPort link carries no DDC/CI at all, so no software on that PC can change
+their input. But if a **second machine** is plugged into one of that monitor's inputs, *its*
+link does carry DDC/CI — so that machine can do the switching.
+
+Hand the job over:
+
+```bash
+dotnet run -- --mac melsfeir@192.168.1.204
+```
+
+The app then:
+
+- ssh's in, runs `m1ddc set input <n>`, and uses **its exit code** as the result — a real
+  success signal, which the local dead link could never give you;
+- names the monitor from what that machine reports (`LS28AG700N`) instead of the useless
+  `Generic PnP Monitor`;
+- binds to the monitor whose local link carries no DDC/CI — or takes `--mac-for <id>` when
+  more than one qualifies, because that is ambiguous and worth deciding deliberately;
+- offers the inputs from `--mac-inputs` (default `displayport1,hdmi2`) as buttons, and says in
+  the UI that the switching happens over SSH rather than locally.
+
+Two things will bite anyone reimplementing this, and both cost time here:
+
+- A non-interactive ssh session gets a bare `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`), so
+  Homebrew is not on it and a bare `m1ddc` is *command not found*. The remote command must use
+  an absolute path.
+- ssh must run with `BatchMode=yes`. Any prompt — host key, passphrase, password — is a hang,
+  not a question, and the app would block forever.
+
+The remote command shape is m1ddc's (`set input <n>`); `--m1ddc <path>` changes the binary,
+not the syntax. `start.cmd` has a `set "MAC=..."` line near the top for the same thing.
+
 ## Known limits
 
 - **The monitor decides.** Input select can only work when the link carries DDC/CI *and* the
