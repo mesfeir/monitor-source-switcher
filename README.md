@@ -44,6 +44,16 @@ dotnet run
 
 Then open <http://127.0.0.1:8152> and press a button.
 
+### Launching it without a terminal
+
+`start.cmd` in the repository root is a double-clickable launcher — put a shortcut to it
+anywhere convenient. It starts the app and opens the UI, and pressing it again while the app
+is already listening just reopens the UI instead of failing on a busy port.
+
+The app runs *in that window*, so the log is visible there and closing the window is how you
+stop it. It uses the app's own `--open` flag to open the UI once Kestrel has actually bound,
+rather than sleeping and hoping the port came up in time.
+
 To produce a self-contained executable:
 
 ```bash
