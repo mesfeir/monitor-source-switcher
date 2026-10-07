@@ -170,6 +170,14 @@ function render(monitors){
       grid.appendChild(b);
     }
 
+    if (m.inputs.length === 0){
+      const none = document.createElement('div');
+      none.className = 'quiet';
+      none.style.marginTop = '14px';
+      none.textContent = 'Nothing switchable on this link.';
+      card.appendChild(none);
+    }
+
     card.appendChild(grid);
 
     if (m.capabilities){

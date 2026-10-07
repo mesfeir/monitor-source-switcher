@@ -149,7 +149,9 @@ curl -s -X POST http://127.0.0.1:8152/api/monitors/1/input/hdmi2 >nul
   panel implements VCP `0x60`. Many Samsung Odyssey monitors implement DDC/CI on their HDMI
   ports **only** and never on DisplayPort — on those, a DisplayPort cable cannot switch them,
   no matter what software you run. Check `supportsInputSelect` in `/api/monitors` before
-  blaming the app.
+  blaming the app. When switching is impossible for a monitor, its `inputs` list comes back
+  **empty** and the web UI shows no buttons: a panel with no switchable inputs is reported,
+  not offered as a menu of guaranteed failures.
 - **Monitors rarely report their current input**, so the app cannot tell you which input is
   live. `cycle` remembers what it last sent, so changing the input on the monitor's own OSD
   makes it drift by one press instead of self-correcting.

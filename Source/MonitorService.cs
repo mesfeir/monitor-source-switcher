@@ -82,7 +82,7 @@ public sealed class MonitorService
                 CurrentInputValue: inputReadable ? (byte)inputValue : null,
                 Brightness: responds ? (int)brightness : null,
                 BrightnessMax: responds ? (int)brightnessMax : null,
-                Inputs: OfferedInputs(capabilities),
+                Inputs: OfferedInputs(responds, capabilities),
                 Note: Describe(responds, capabilities),
                 Capabilities: capabilities?.Raw));
         }
@@ -91,14 +91,20 @@ public sealed class MonitorService
     }
 
     /// <summary>
-    /// Prefers the inputs the panel advertises for VCP 0x60. Falls back to the full MCCS list
-    /// when the panel will not say, so an uncooperative monitor is still switchable.
+    /// The inputs worth offering. Buttons appear only when switching is actually plausible, so
+    /// the UI never presents a menu of guaranteed failures:
+    ///
+    /// - the panel advertises 0x60 -> exactly the values it says it accepts
+    /// - the link answers but the panel says nothing about 0x60 -> the full MCCS list, because
+    ///   some panels do not implement the optional capabilities request at all
+    /// - the panel reports no 0x60, or nothing answers on the link -> nothing
     /// </summary>
-    private static List<InputDto> OfferedInputs(MccsCapabilities? capabilities)
+    private static List<InputDto> OfferedInputs(bool responds, MccsCapabilities? capabilities)
     {
-        // The panel told us it has no input select, so offering inputs would only invite
-        // pointless calls. A panel that stays silent still gets the full list to try.
         if (capabilities is { SupportsInputSelect: false })
+            return new List<InputDto>();
+
+        if (capabilities is null && !responds)
             return new List<InputDto>();
 
         var advertised = capabilities?.InputValues ?? Array.Empty<byte>();
